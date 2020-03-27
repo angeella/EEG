@@ -1,3 +1,154 @@
+Skip to content
+Search or jump to.
+
+Pull requests
+Issues
+Marketplace
+Explore
+
+@angeella 
+bnicenboim
+/
+  eeguana
+4
+71
+Code Issues 31 Pull requests 0 Actions Projects 0 Wiki Security Insights
+eeguana/R/constructors_helpers.R
+@bnicenboim bnicenboim bdf events fixed
+a031e18 yesterday
+210 lines (191 sloc)  4.63 KB
+
+#' @noRd
+new_eeg_lst <- function(.signal = NULL, .events = NULL, .segments = NULL) {
+  x <- list(
+    .signal = .signal,
+    .events = .events,
+    .segments = .segments
+  )
+  x <- unclass(x)
+  structure(x,
+            class = c("eeg_lst"),
+            vars = character(0)
+  )
+}
+
+
+
+#' @param values
+#'
+#' @param sampling_rate
+#'
+#' @noRd
+new_sample_int <- function(values, sampling_rate) {
+  if (!all(is_wholenumber(values))) {
+    stop("Sample integer values should be round numbers.",
+         call. = FALSE
+    )
+  } else {
+    values <- as_integer(values)
+  }
+  values <- unclass(values)
+  structure(values,
+            class = "sample_int",
+            sampling_rate = sampling_rate
+  )
+}
+
+#' @param .sample
+#'
+#' @noRd
+validate_sample_int <- function(.sample) {
+  if (!is.integer(.sample) && 
+      ## I also want to accept one Inf number, for e.g., baseline
+      !(length(.sample)==1 && is.infinite(.sample))) {
+    warning("Samples should be integers.",
+            call. = FALSE
+    )
+  }
+  if (length(.sample) > 0) {
+    if (attributes(.sample)$sampling_rate <= 0) {
+      warning("Attribute sampling_rate should be a positive value.",
+              call. = FALSE
+      )
+    }
+  }
+  .sample
+}
+
+#' @noRd
+new_channel_dbl <- function(values, channel_info = list()) {
+  values <- unclass(values) %>% as.double()
+  attributes(values) <- c(
+    class = "channel_dbl",
+    channel_info
+  )
+  values
+}
+
+
+
+#' @param channel
+#'
+#' @noRd
+validate_channel_dbl <- function(channel) {
+  if (!is.double(channel)) {
+    stop("Values should be double.",
+         call. = FALSE
+    )
+  }
+  purrr::walk(c(".x", ".y", ".z"), ~
+                if (!is.numeric(attr(channel, .))) {
+                  warning(sprintf("Attribute %s should be a number.", .),
+                          call. = FALSE
+                  )
+                })
+  
+  # if (is.null(attributes(channel)$.reference)) {
+  #   warning("Attribute .reference is missing.",
+  #     call. = FALSE
+  #   )
+  # }
+  channel
+}
+
+
+#' @param channels
+#'
+#' @param channels_tbl
+#'
+#' @noRd
+update_channel_meta_data <- function(channels, channels_tbl) {
+  if (nrow(channels_tbl) == 0 || is.null(channels_tbl)) {
+    channels <- purrr::map(
+      channels,
+      function(sig) {
+        .channel <- new_channel_dbl(
+          values = sig,
+          channel_info = list(
+            .x = NA_real_,
+            .y = NA_real_,
+            .z = NA_real_,
+            .reference = NA_real_
+          )
+        )
+      }
+    )
+  } else {
+    channels <- purrr::map2(
+      channels %>% stats::setNames(make_names(channels_tbl$.channel)),
+      purrr::transpose(dplyr::select(channels_tbl, -.channel)),
+      function(sig, chan_info) {
+        .channel <- new_channel_dbl(values = sig, as.list(chan_info))
+      }
+    )
+  }
+  channels
+}
+
+#
+#' @param x
+#'
+#' @noRd
 validate_eeg_lst <- function(x, recursive = TRUE) {
   if (!is_eeg_lst(x)) {
     warning("Class is not eeg_lst", call. = FALSE)
@@ -33,4 +184,123 @@ validate_eeg_lst <- function(x, recursive = TRUE) {
     )
   }
   x
+}
+
+#' @param segments
+#'
+#' @noRd
+validate_segments <- function(segments) {
+  if (is.null(segments)) {
+    segments <- dplyr::tibble(.id = integer(0))
+  }
+  if (!is.integer(segments$.id)) {
+    warning("Column .id of segments table is not an integer.")
+  }
+  if (length(segments$.id) != length(unique(segments$.id))) {
+    warning("Some .id are repeated in the segments table, there is something wrong going on. Please open an issue with a reproducible example in https://github.com/bnicenboim/eeguana/issues",
+            call. = FALSE
+    )
+  }
+  segments
+}
+
+#' @param values
+#'
+#' @noRd
+new_component_dbl <- function(values) {
+  values <- unclass(values) %>% as.double()
+  attributes(values) <- list(
+    class = "component_dbl"
+  )
+  values
+}
+
+
+
+#' @param component
+#'
+#' @noRd
+validate_component_dbl <- function(component) {
+  if (!is.double(component)) {
+    stop("Values should be double.",
+         call. = FALSE
+    )
+  }
+  component
+}
+validate_signal_tbl <- function(signal_tbl) {
+  ## if(is.null(signal_tbl)) {
+  ##     signal_tbl <- data.table::data.table(.id= integer(0),.sample= integer(0))
+  ##     data.table::setkey(signal_tbl,.id,.sample)
+  ## }
+  ##  if(!data.table::is.data.table(signal_tbl) && is.data.frame(signal_tbl)) {
+  ##      signal <- data.table::as.data.table(signal_tbl)
+  ##      data.table::setkey(signal_tbl,.id,.sample)
+  # fs# }
+  if (!data.table::is.data.table(signal_tbl)) {
+    warning("'signal' should be a data.table.",
+            call. = FALSE
+    )
+  }
+  if (!is_signal_tbl(signal_tbl)) {
+    warning("Class is not signal_tbl", call. = FALSE)
+  }
+  if (!is.integer(signal_tbl$.id)) {
+    warning(".id should be an integer.",
+            call. = FALSE
+    )
+  }
+  
+  if (!identical(data.table::key(signal_tbl), c(".id", ".sample"))) {
+    warning("`keys` of signal table are missing.",
+            call. = FALSE
+    )
+  }
+  
+  ## Validates .sample
+  if (!is_sample_int(signal_tbl$.sample)) {
+    warning("Values of .sample should be samples",
+            call. = FALSE
+    )
+  }
+  
+  ## checks if there are channels
+  if (nrow(signal_tbl) > 0) {
+    nchannels <- sum(sapply(signal_tbl, is_channel_dbl))
+    ncomponents <- sum(sapply(signal_tbl, is_component_dbl))
+    if (nchannels == 0 & ncomponents == 0) {
+      warning("No channels or components found.")
+    }
+  }
+  
+  ## Validates channels
+  signal_tbl[, lapply(.SD, validate_channel_dbl), .SDcols = sapply(signal_tbl, is_channel_dbl)]
+  ## reorders
+  dplyr::select(signal_tbl, obligatory_cols[[".signal"]], dplyr::everything())
+}
+
+
+#' Test if the object is a  signal_tbl
+#' This function returns  TRUE for signals.
+#'
+#' @param x An object.
+#'
+#' @family signal_tbl
+#'
+#' @return `TRUE` if the object inherits from the `signal_tbl` class.
+#' @export
+is_signal_tbl <- function(x) {
+  "signal_tbl" %in% class(x)
+}
+
+#' @noRd
+as_eeg_ica_lst <- function(.data, ...) {
+  UseMethod("as_eeg_ica_lst")
+}
+as_eeg_ica_lst.eeg_ica_lst <- function(.data, ...) {
+  .data
+}
+as_eeg_ica_lst.eeg_lst <- function(.data, ...) {
+  class(.data) <- c("eeg_ica_lst", class(.data))
+  .data
 }

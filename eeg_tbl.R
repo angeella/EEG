@@ -1,5 +1,5 @@
 #################Create eeg_lst object##################################
-path <- "C:/Users/Angela Andreella/Downloads/"
+
 load(paste0(path,"data_eeg_emotion.RData"))
 #signal tbl
 #events tbl
@@ -57,6 +57,7 @@ data.table::setkey(.signal, .id, .sample)
                                            .type = dati$events$event_type,
                                            .subj = dati$events$subj))
 
+
 segments_tbl <- dplyr::tibble(.id =  dati$epochs$epoch, .recording = dati$epochs$recording)
 #segments_tbl <- validate_segments(segments_tbl)
 
@@ -100,48 +101,3 @@ data %>%
     aes(color = 10)
   )
 
-design <- expand.grid(subject = c(111, 113, 115, 116, 117, 118, 120, 122, 123, 124, 126, 127, 128, 
-                                  130, 131, 132, 134, 135, 137, 138, 139, 140, 141, 142, 143, 144, 
-                                  145, 146, 147), stimuli = c("AP", "SED"), action = c("Av_App", "Av_Ev"))
-
-distance_matrix <- dist(cbind(dati$chan_info$cart_x,dati$chan_info$cart_y,dati$chan_info$cart_z))
-adjacency_matrix <- as.matrix(distance_matrix) < 35
-diag(adjacency_matrix) <- FALSE
-dimnames(adjacency_matrix) = list(dati$chan_info$electrode, dati$chan_info$electrode)
-
-graph <- graph_from_adjacency_matrix(adjacency_matrix, mode = "undirected")
-graph <- delete_vertices(graph, V(graph)[!get.vertex.attribute(graph, "name")%in%(dati$chan_info$electrode)])
-
-graph <- set_vertex_attr(graph,"x", value = coord[match(vertex_attr(graph,"name"),dati$chan_info$electrode),2])
-graph <-set_vertex_attr(graph,"y", value = coord[match(vertex_attr(graph,"name"),dati$chan_info$electrode),3])
-graph <-set_vertex_attr(graph,"z", value = coord[match(vertex_attr(graph,"name"),dati$chan_info$electrode),4])
-plot(graph)
-
-#I need to compute the 3d array: The first dimension is the permutations, the second the samples, the third is the channels.
-
-#devo creare 
-#design: 
-design <- expand.grid(subject = dati$events$subj, stimuli = c(2, 4))
-
-#formula: ~ stimuli + Error(subject/(stimuli))
-#signal:signal a 3 dimentional array. The the row are the observations, 
-#colomn the time and the third dimention are the nodes of the graph.
-
-signal <- as.array(.signal)
-
-brainperm #compute the clustermass test based on multiple signal.
-
-np <- 100 #number of permutations
-aggr_FUN <- sum
-ncores <- 5
-contr <- contr.sum
-formula <- ~ stimuli + Error(subject/(stimuli))
-pmat <- Pmat(np = np, n = nrow(design))
-
-#compute clusters from permuco4brain
-# @param threshold The threshold used to compute the clusters.
-# @param aggr_FUN The function that aggregate the cluster into a scalar (cluster mass).
-# @param graph A igraph object representing the adjacency of electrod in a scalp.
-model <- clustergraph_rnd(formula = formula, data = design, signal = signal, graph = graph, 
-                          aggr_FUN = aggr_FUN, method = "Rd_kheradPajouh_renaud", contr = contr, 
-                          return_distribution = F, threshold = NULL, ncores = ncores, P = pmat)
