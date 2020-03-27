@@ -1,0 +1,54 @@
+---
+title: "EEG data"
+author: "Angela Andreella"
+date: "26/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(eeguana)
+library(eegUtils)
+path <- "C:/Users/Angela Andreella/Downloads/"
+load(paste0(path,"data_eeg_emotion.RData"))
+
+
+
+```
+
+Data structure:
+
+ - $32$ Channels, each one with $50000$ observations;
+ - $20$ Subjects dati$events$subj
+ - $5$ stimuli = 1 (fear),  2 (happiness), 3 (disgust), 4 (neutral), 5 (object) dati$events$event_type
+ 
+Usually the interest is around P170 analyzing the time $>0$.
+
+We have $500$ observations for each subject and each stimuli. We analyze the mean over these $500$ observations.
+ 
+```{r}
+nsubj <- max(dati$events$subj)
+nchannels <- ncol(dati$signals)
+
+data <- matrix(NA,nrow=nsubj,ncol=nchannels)
+
+for(i in 1:nsubj){
+  data[i,] <- colMeans(dati$signals[(dati$events$event_onset[which(dati$events$event_type==2)][i]):(dati$events$event_onset[which(dati$events$event_type==3)][i]-1),]) - colMeans(dati$signals[(dati$events$event_onset[which(dati$events$event_type==4)][i]):(dati$events$event_onset[which(dati$events$event_type==5)][i]-1),])
+
+}
+
+data <- as.data.frame(data)
+colnames(data) <- colnames(dati$signals)
+
+subj_mean <- colMeans(data)
+subj_var <- apply(data, 2, var)
+
+```
+ 
+ 
