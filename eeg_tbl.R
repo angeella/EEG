@@ -80,28 +80,30 @@ data.table::setkey(.signal, .id, .sample)
   .id = dati$events$epoch,
   #.initial = dati$events$event_onset %>%
   #  as_sample_int(sampling_rate = dati$srate, unit = "s"),
-  .initial = rep(1,length(dati$events$epoch)) %>%
-    as_sample_int(sampling_rate = dati$srate, unit = "s"), 
-  #.final = as_sample_int(dati$events$event_onset + dati$events$event_time, 
-  #                       sampling_rate =  dati$srate, unit = "s") - 1L,
+  .initial = dati$events$event_onset,
+  .final = dati$events$event_onset + 500,
   #.final = as_sample_int(dati$events$event_onset, 
   #                      sampling_rate =  dati$srate, unit = "s"),
-  .final = rep(1,length(dati$events$epoch)) %>%
-    as_sample_int(sampling_rate = dati$srate, unit = "s"), 
+  #.final = rep(1,length(dati$events$epoch)) %>%
+  #  as_sample_int(sampling_rate = dati$srate, unit = "s"), 
   .channel = NA_character_,
   descriptions_dt = data.table::data.table(
  # .recording = dati$epochs$recording, 
                                            .type = rep("Stimulus",length(dati$events$event_type)),
-                                           .description = dati$events$event_type))
+                                           .description = paste0(dati$events$event_type)))
  #                                          .subj = dati$events$subj))
 
+attr(.events$.initial,"sampling_rate")=dati$srate
+attr(.events$.initial,"class")="sample_int"
+attr(.events$.final,"sampling_rate")=dati$srate
+attr(.events$.final,"class")="sample_int"
 data.table::setkey(.events, .id)
 #segments_tbl <- dplyr::tibble(.id =  dati$epochs$epoch, .recording = dati$epochs$recording)
 segments_tbl <- dplyr::tibble(.id = dati$epochs$epoch, 
                               .recording = dati$epochs$recording,
-                              description = dati$events$event_type,
-                              segment = rep(1,length(dati$epochs$recording)),
-                              type = rep("Stimulus", length(dati$epochs$recording)))
+                              #description = dati$events$event_type,
+                              segment = rep(1,length(dati$epochs$recording)))
+                              #type = rep("Stimulus", length(dati$epochs$recording)))
 
 segments_tbl <- validate_segments(segments_tbl)
 
@@ -125,16 +127,20 @@ events_tbl(data)
 
 #Filter by condtions happy and neutral faces
 
-data_filter <- data %>%
-  filter(description %in% c(2, 4)) %>%
+data_seg <- data %>%
+  eeg_segment(.description %in% c("2","4"),
+              lim = c(-0.2, 0.2)
+  ) 
+
+data_segs_some <- data_seg %>%
   mutate(
     condition =
-      if_else(description == 2, "happy", "neutral")
+      if_else(description == "2", "happy", "neutral")
   ) %>%
   select(-type)
 
 #Some plots
-data_filter %>%
+data_segs_some %>%
   select(O1, O2, P7, P8) %>%
   ggplot(aes(x = .time, y = .value)) +
   geom_line(alpha = .1, aes(group = .id, color = condition)) +
@@ -146,6 +152,17 @@ data_filter %>%
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = .17, linetype = "dotted") +
   theme(legend.position = "bottom")
+
+data_filter %>%
+  filter(between(as_time(.sample, unit = "milliseconds"), 100, 200)) %>%
+  group_by(condition) %>%
+  summarize_at(channel_names(.), mean, na.rm = TRUE) %>%
+  plot_topo() +
+  annotate_head() +
+  geom_contour() +
+  geom_text(colour = "black") +
+  facet_grid(~condition)
+
 
 data_filter %>%
   filter(between(as_time(.sample, unit = "milliseconds"), 100, 200)) %>%

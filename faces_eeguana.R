@@ -14,3 +14,4 @@ GET("https://osf.io/uhsde//?action=download",
 faces <- read_vhdr("s1_faces.vhdr")
 
 events_tbl(faces)
+channels_tbl(faces)
