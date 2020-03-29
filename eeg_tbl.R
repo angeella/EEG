@@ -78,12 +78,16 @@ data.table::setkey(.signal, .id, .sample)
 
 .events <- new_events_tbl (
   .id = dati$events$epoch,
-  .initial = dati$events$event_onset %>%
-    as_sample_int(sampling_rate = dati$srate, unit = "s"),
-  .final = as_sample_int(dati$events$event_onset + dati$events$event_time, 
-                         sampling_rate =  dati$srate, unit = "s") - 1L,
+  #.initial = dati$events$event_onset %>%
+  #  as_sample_int(sampling_rate = dati$srate, unit = "s"),
+  .initial = rep(1,length(dati$events$epoch)) %>%
+    as_sample_int(sampling_rate = dati$srate, unit = "s"), 
+  #.final = as_sample_int(dati$events$event_onset + dati$events$event_time, 
+  #                       sampling_rate =  dati$srate, unit = "s") - 1L,
   #.final = as_sample_int(dati$events$event_onset, 
-  #                       sampling_rate =  dati$srate, unit = "s"),
+  #                      sampling_rate =  dati$srate, unit = "s"),
+  .final = rep(1,length(dati$events$epoch)) %>%
+    as_sample_int(sampling_rate = dati$srate, unit = "s"), 
   .channel = NA_character_,
   descriptions_dt = data.table::data.table(
  # .recording = dati$epochs$recording, 
@@ -95,8 +99,9 @@ data.table::setkey(.events, .id)
 #segments_tbl <- dplyr::tibble(.id =  dati$epochs$epoch, .recording = dati$epochs$recording)
 segments_tbl <- dplyr::tibble(.id = dati$epochs$epoch, 
                               .recording = dati$epochs$recording,
-                              conditions = dati$events$event_type)
-                              #segment = rep(1,length(dati$epochs$recording)))
+                              description = dati$events$event_type,
+                              segment = rep(1,length(dati$epochs$recording)),
+                              type = rep("Stimulus", length(dati$epochs$recording)))
 
 segments_tbl <- validate_segments(segments_tbl)
 
@@ -118,16 +123,17 @@ channels_tbl(data)
 signal_tbl(data)
 events_tbl(data)
 
-#other plot
-plot_components(data)
+#Filter by condtions happy and neutral faces
 
 data_filter <- data %>%
-  filter(conditions %in% c(2, 4)) %>%
+  filter(description %in% c(2, 4)) %>%
   mutate(
     condition =
-      if_else(conditions == 2, "happy", "neutral")
-  )
+      if_else(description == 2, "happy", "neutral")
+  ) %>%
+  select(-type)
 
+#Some plots
 data_filter %>%
   select(O1, O2, P7, P8) %>%
   ggplot(aes(x = .time, y = .value)) +
