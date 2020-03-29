@@ -136,7 +136,7 @@ data_seg <- data %>%
 data_segs_some <- data_seg %>%
   mutate(
     condition =
-      if_else(description == "2", "happy", "neutral")
+      if_else(description == 2, "happy", "neutral")
   ) %>%
   select(-type)
 
@@ -154,88 +154,75 @@ data_segs_some %>%
   geom_vline(xintercept = .17, linetype = "dotted") +
   theme(legend.position = "bottom")
 
-data_filter %>%
-  filter(between(as_time(.sample, unit = "milliseconds"), 100, 200)) %>%
-  group_by(condition) %>%
-  summarize_at(channel_names(.), mean, na.rm = TRUE) %>%
-  plot_topo() +
-  annotate_head() +
-  geom_contour() +
-  geom_text(colour = "black") +
-  facet_grid(~condition)
-
-
-data_filter %>%
-  filter(between(as_time(.sample, unit = "milliseconds"), 100, 200)) %>%
-  group_by(condition) %>%
-  summarize_at(channel_names(.), mean, na.rm = TRUE) %>%
-  plot_topo() +
-  annotate_head() +
-  geom_contour() +
-  geom_text(colour = "black") +
-  facet_grid(~condition)
-
-
-
-
-#We consider the happy faces and netural stimuli
-data_segs <- data %>%
-  eeguana::eeg_segment(.description %in% c(2,4), lim = c(0,0.2))
-
-
-segments_tbl(data_segs)
-
-data1 <- merge(data$.signal,data$.events,by = ".id", all.x = TRUE) %>% filter(.description %in% c(2,4))
-
-data_segs$.signal <- data.table::data.table(data1[1:34])
-a<-as.factor(data_segs$.signal$.id)
-levels(a) <- c(1:40)
-data_segs$.signal$.id <- as.integer(a)
-data_segs$.signal[, .id := .id][, .sample := .sample]
-data.table::setnames(data_segs$.signal, make_names(colnames(data_segs$.signal)))
-data.table::setcolorder(data_segs$.signal, c(".id", ".sample"))
-data.table::setattr(data_segs$.signal, "class", c("signal_tbl", class(data_segs$.signal)))
-
-data.table::setkey(data_segs$.signal, .id, .sample)
-
-
-
-data_segs %>%
-  select(Fz, FCz, Cz, CPz) %>%
+data_segs_some %>%
+  transmute(
+    Occipital = chs_mean(O1, O2, na.rm = TRUE),
+    Parietal = chs_mean(P3, P4, P7, P8, Pz, na.rm = TRUE)
+  ) %>%
   ggplot(aes(x = .time, y = .value)) +
   geom_line(alpha = .1, aes(group = .id, color = condition)) +
   stat_summary(
-    fun.y = "mean", geom = "line", alpha = 1, size = 1.5,
+    fun.y = "mean", geom = "line", alpha = 1, size = 1,
     aes(color = condition)
   ) +
   facet_wrap(~.key) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  geom_vline(xintercept = .17, linetype = "dotted") +
   theme(legend.position = "bottom")
 
 
+ERP_data <- data_segs_some %>%
+  group_by(.sample, condition) %>%
+  summarize_at(channel_names(.), mean, na.rm = TRUE)
 
-data_ica <- data %>%
-  eeg_ica(method = adapt_fast_ICA, ignore = NULL)
-data_ica %>% plot_components()
+ERP_plot <- ERP_data %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(aes(color = condition)) +
+  facet_wrap(~.key) +
+  theme(legend.position = "bottom") +
+  ggtitle("ERPs for happy vs neutral") +
+  theme_eeguana()
 
-faces_ica <- data_ica %>%
-  eeg_artif_step(Fp1, Fp2, F3, threshold = 30, window = 200, unit = "ms", freq=c(1,10)) %>%
-  eeg_artif_peak(Fp1, threshold=100, freq=c(1,10))
+ERP_plot %>% plot_in_layout()
 
-s_peaks <- filter(events_tbl(faces_ica),  str_starts(.description, "peak")) %>% pull(.initial)
-eeguana:::plot_ica.eeg_ica_lst(faces_ica, samples = seq(s_peaks[1]-2000,s_peaks[1]+2000))
+data_segs_some %>%
+  filter(between(as_time(.sample, unit = "s"), .1, .2)) %>%
+  group_by(condition) %>%
+  summarize_at(channel_names(.), mean, na.rm = TRUE) %>%
+  plot_topo() +
+  annotate_head() +
+  geom_contour() +
+  geom_text(colour = "black") +
+  facet_grid(~condition)
 
-
-
-conditions <- c(rep(1,500), rep(2,500), rep(3,500), rep(4,500), rep(5,500))
-
-data %>%
-  select(O1, O2) %>%
-  ggplot(aes(x = .time, y = .value))+
-  geom_line(alpha = .1, aes(group = data$.signal$.id, color = conditions)) +
-  stat_summary(
-    fun.y = "mean", geom = "line", alpha = 1, size = 1.5,
-    aes(color = 10)
+df <- data_segs_some %>%
+  select(O1, O2, P7, P8) %>%
+  as_tibble() %>%
+  # We can use regular dplyr functions now
+  group_by(.key, .time) %>%
+  summarize(
+    `t-value` = t.test(
+      .value[condition == "happy"],
+      .value[condition == "neutral"]
+    )$statistic
   )
+
+
+ggplot(df, aes(x = .time, y = `t-value`)) + geom_line() +
+  facet_wrap(~.key)
+
+
+faces_seg_t <-
+  data_segs_some %>%
+  select(O1, O2, P7, P8) %>%
+  group_by(.sample) %>%
+  summarize_at(channel_names(.), list(t =  ~t.test(
+    .[condition == "happy"],
+    .[condition == "neutral"]
+  )$statistic))
+
+faces_seg_t %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(alpha = .1, aes(group = .id)) +
+  stat_summary(fun.y = "mean", geom = "line", alpha = 1, size = 1) +
+  facet_wrap(~.key) +
+  theme(legend.position = "bottom")
 
