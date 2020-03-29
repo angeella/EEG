@@ -1,24 +1,3 @@
-Skip to content
-Search or jump to.
-
-Pull requests
-Issues
-Marketplace
-Explore
-
-@angeella 
-bnicenboim
-/
-  eeguana
-4
-71
-Code Issues 31 Pull requests 0 Actions Projects 0 Wiki Security Insights
-eeguana/R/constructors_helpers.R
-@bnicenboim bnicenboim bdf events fixed
-a031e18 yesterday
-210 lines (191 sloc)  4.63 KB
-
-#' @noRd
 new_eeg_lst <- function(.signal = NULL, .events = NULL, .segments = NULL) {
   x <- list(
     .signal = .signal,

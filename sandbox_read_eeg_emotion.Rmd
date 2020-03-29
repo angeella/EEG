@@ -1,0 +1,183 @@
+---
+title: "EEGemotions"
+author: "livio finos"
+date: "25 marzo 2020"
+output: 
+  html_document: 
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Settings
+
+```{r}
+rm(list=ls())
+path <- "C:/Users/Angela Andreella/Downloads/"
+load(paste0(path,"data_eeg_emotion.RData"))
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(eeguana)
+```
+
+<https://bnicenboim.github.io/eeguana/articles/intro.html>
+
+# Read Data
+
+```{r}
+
+#IMPORTING ".SET" fileS
+library(eegUtils)
+
+file_name_set="C:/EEGdata/grand/ae011s.set"
+
+D=import_set(file_name_set)
+
+D$ events
+
+D$chan_info
+
+D$signals
+
+# D$timings
+table(D$timings$epoch)
+
+
+table(D$ events$event_type)
+length(D$ events$event_type)
+pryr::object_size(D)
+
+```
+
+
+## Convert to `eeg_lst` 
+
+```{r,eval=FALSE}
+
+#######################
+##### convert to eeguana::eeg_lst
+
+# faces <- read_vhdr("s1_faces.vhdr")
+# faces$.signal=faces$.signal[1:2,]
+# faces$.events=faces$.events[1:2,]
+# empty=faces
+# save(file="empty_eeg_lst",empty)
+load("empty_eeg_lst")
+dati=empty
+
+dati$.signal = D$signals
+dati$.signal$.id=D$timings$epoch
+dati$.signal$.sample=D$timings$sample
+
+dati$.events = D$events
+names(dati$.events)=c( ".initial",".final",".type",".id","time")
+dati$.events$.type <- dati$.events$.description <- "Stimulus"
+dati$.segments$.recording=file_name_set
+dati$.events$.channel=NA
+dati$.events$.final <- dati$.events$.initial <- 1
+
+attr(dati$.events$.initial,"sampling_rate")=D$srate
+attr(dati$.events$.initial,"class")="sample_int"
+
+temp=as.list(dati$.segments)
+
+temp$segment <- temp$.id <- dati$.events$.id
+temp$type=dati$.events$.type
+
+dati$.segments <- tbl_df(data.frame(temp))
+```
+
+## LOCATION: NON FUNZIONA!
+
+```{r,eval=FALSE}
+# channels_tbl(faces)
+
+# .channel number .reference resolution unit      radius theta   phi    .x    .y    .z
+ names(D$chan_info)
+# [1] "electrode" "radius"    "theta"     "phi"       "cart_x"    "cart_y"    "cart_z"
+# [8] "x"         "y" 
+
+chan_info <- D$chan_info
+names(chan_info) <- c(".channel","radius","theta","phi",".x",".y",".z","x","y")
+
+chan_info$.reference=""
+chan_info$resolution=1
+chan_info$unit="microvolt"
+
+# channels_tbl(dati) <- chan_info
+
+```
+
+# plot: NON FUNZIONA
+
+```{r,eval=FALSE}
+plot(dati)
+```
+
+## Altro plot
+
+```{r,eval=FALSE}
+library(ggplot2)
+dati %>%
+  select(O1, O2, P7, P8) %>%
+  ggplot(aes(x = .sample, y = .value)) +
+  geom_line(alpha = .1, aes(group = .id)) +
+  stat_summary(
+    fun = "mean", geom = "line", alpha = 1, size = 1.5) +
+  facet_wrap(~.key) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = .17, linetype = "dotted") +
+  theme(legend.position = "bottom")
+
+```
+
+
+# eegUtils
+
+Already filtered
+
+```{r}
+library(future)
+plan(multiprocess)
+plot_psd(D, 
+         freq_range = c(0, 60),
+         legend = FALSE)
+
+```
+
+
+```{r}
+plot_butterfly(D,
+               time_lim = c(-.1, .5))
+```
+
+
+```{r}
+channels(D)
+```
+
+```{r}
+topoplot(D, time_lim = c(.25, .35))
+```
+
+
+```{r}
+D %>%
+  mutate(occipital = (O1 + O2) / 2) %>%
+  select(PO7, PO8, occipital) %>%
+  filter(epoch <= 60, time > -.1, time < .5) %>%
+  ggplot(aes(x = time, y = amplitude)) +
+  geom_line(aes(group = epoch), alpha = 0.2) + 
+  stat_summary(fun.y = mean,
+               geom = "line",
+               size = 2,
+               aes(colour = electrode)) +
+  facet_wrap(~electrode) + 
+  scale_colour_viridis_d() +
+  geom_vline(xintercept = 0) +
+  geom_hline(yintercept = 0) +
+  theme_classic()
+```
+

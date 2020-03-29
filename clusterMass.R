@@ -20,9 +20,12 @@ load("data_eeg_emotion.RData")
 # graph
 
 #1. design
-design <- expand.grid(subject = dati$events$subj, stimuli = 2)
+dati$signals <- dati$signals[,1:27]
+
+design <- expand.grid(subject = dati$events$subj, stimuli = c(2,4))
 
 data1 <- dplyr::left_join(dati$timings, dati$events, by = "epoch")
+
 #2. signal
 signal <- list()
 for(i in 1:nrow(design)){
@@ -50,19 +53,19 @@ coord <- data.frame(dati$chan_info$electrode,
                     dati$chan_info$cart_z)
 colnames(coord) <- c("electrode","x","y","z")
 
-distance_matrix <- dist(coord[, 2:4])
+dati$chan_info <- dati$chan_info[1:27,]
 
+distance_matrix <- dist(cbind(dati$chan_info$cart_x,dati$chan_info$cart_y,dati$chan_info$cart_z))
 adjacency_matrix <- as.matrix(distance_matrix) < 35
 diag(adjacency_matrix) <- FALSE
-
-dimnames(adjacency_matrix) = list(coord[,1], coord[,1])
+dimnames(adjacency_matrix) = list(dati$chan_info$electrode, dati$chan_info$electrode)
 
 graph <- graph_from_adjacency_matrix(adjacency_matrix, mode = "undirected")
-graph <- delete_vertices(graph, V(graph)[!get.vertex.attribute(graph, "name")%in%(coord[,1])])
+graph <- delete_vertices(graph, V(graph)[!get.vertex.attribute(graph, "name")%in%(dati$chan_info$electrode)])
 
-graph <- set_vertex_attr(graph,"x", value = coord[match(vertex_attr(graph,"name"),coord[,1]),2])
-graph <-set_vertex_attr(graph,"y", value = coord[match(vertex_attr(graph,"name"),coord[,1]),3])
-graph <-set_vertex_attr(graph,"z", value = coord[match(vertex_attr(graph,"name"),coord[,1]),4])
+graph <- set_vertex_attr(graph,"x", value = coord[match(vertex_attr(graph,"name"),dati$chan_info$electrode),2])
+graph <-set_vertex_attr(graph,"y", value = coord[match(vertex_attr(graph,"name"),dati$chan_info$electrode),3])
+graph <-set_vertex_attr(graph,"z", value = coord[match(vertex_attr(graph,"name"),dati$chan_info$electrode),4])
 plot(graph)
 
 np <- 100 #number of permutations
@@ -79,3 +82,6 @@ pmat <- Pmat(np = np, n = nrow(design))
 model <- clustergraph_rnd(formula = formula, data = design, signal = signal, graph = graph, 
                           aggr_FUN = aggr_FUN, method = "Rd_kheradPajouh_renaud", contr = contr, 
                           return_distribution = F, threshold = NULL, ncores = ncores, P = pmat)
+image(model,effect = 2)
+print(model, effect = "stimuli")
+

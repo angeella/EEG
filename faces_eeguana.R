@@ -12,3 +12,5 @@ GET("https://osf.io/uhsde//?action=download",
     progress()
 )
 faces <- read_vhdr("s1_faces.vhdr")
+
+events_tbl(faces)
