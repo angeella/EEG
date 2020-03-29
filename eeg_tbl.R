@@ -129,8 +129,9 @@ events_tbl(data)
 
 data_seg <- data %>%
   eeg_segment(.description %in% c("2","4"),
-              lim = c(-0.2, 0.2)
-  ) 
+              lim = c(min(dati$timings$time), max(dati$timings$time))
+  ) %>%
+  eeg_baseline()
 
 data_segs_some <- data_seg %>%
   mutate(
