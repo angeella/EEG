@@ -46,10 +46,12 @@ graph <- position_to_graph(channels_tbl(data), name = .channel, delta = 53,
 igraph::rglplot(graph)
 plot(graph)
 
-formula <- signal ~ condition +Error(.subj/(condition))
+formula <- signal ~ condition + Error(.subj/(condition))
+formula <- signal~ .channel*condition + .subj + Error(.subj/(.channel*condition))
+
 np = 5000
 #pmat <- Pmat(np = np, n = nrow(design))
-model <- permuco4brain::brainperm(  formula = formula,
+model1 <- permuco4brain::brainperm(  formula = formula,
                                     data = design,
                                     graph = graph,
                                     np = np,

@@ -235,4 +235,5 @@ model <- brainperm(formula = formula, data = design, graph = graph)
 ```
 
 
+
 ### Bibliography
