@@ -31,7 +31,7 @@ dim(signal)
 #First dim is the observations, second time, third node
 #We take a subset
 
-#signal_sub <- signal[,100:400,]
+signal <- signal[,100:400,]
 
 data$.segments$condition <- data$.events$.description
 
@@ -46,8 +46,8 @@ igraph::rglplot(graph)
 plot(graph)
 
 formula <- signal ~ condition +Error(.subj/(condition))
-np = 200
-pmat <- Pmat(np = np, n = nrow(design))
+np = 1000
+#pmat <- Pmat(np = np, n = nrow(design))
 model <- permuco4brain::brainperm(  formula = formula,
                                     data = design,
                                     graph = graph,
@@ -64,5 +64,13 @@ model <- permuco4brain::brainperm(  formula = formula,
 dim(model$model.matrix)
 dim(model$multiple_comparison[[1]]$uncorrected$distribution)
 
+#We visualize the results using a statistical map. 
+#Statistics below the threshold are shown in white, 
+#non-significant cluster in grey and significant cluster in red-yellow:
+image(model)
+#The statistics of the cluster are show using the print method. 
+#It displays, for each cluster, the number of test, 
+#its cluster-mass and the p-value based on the permutation null distribution:
+print(model, effect = "condition")
 
 
