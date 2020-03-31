@@ -43,6 +43,7 @@ ARIeeg <- function(model, alpha, summary_stat, silent, family, delta, ct){
   
   out_d <- t(as.data.frame(out))
   rownames(out_d) = NULL
+  out_d
 }
 
 summary_perm_eeg <- function(cv,ix,pvalues){
