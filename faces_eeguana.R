@@ -15,3 +15,8 @@ faces <- read_vhdr("s1_faces.vhdr")
 
 events_tbl(faces)
 channels_tbl(faces)
+
+faces_seg <- faces %>%
+    eeg_segment(.description %in% c("s70","s71"),
+                lim = c(-0.2, 0.25)) 
+

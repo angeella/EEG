@@ -20,11 +20,12 @@ load("data_eeg_emotion.RData")
 # graph
 
 #1. design
-dati$signals <- dati$signals[,1:27]
+dati1 <- dati
+dati1$signals <- dati$signals[,1:27]
 
-design <- expand.grid(subject = dati$events$subj, stimuli = c(2,4))
+design <- expand.grid(subject = unique(dati1$events$subj), stimuli = c(2,4))
 
-data1 <- dplyr::left_join(dati$timings, dati$events, by = "epoch")
+data1 <- dplyr::left_join(dati1$timings, dati1$events, by = "epoch")
 
 #2. signal
 signal <- list()
@@ -33,8 +34,8 @@ for(i in 1:nrow(design)){
   which_id <- design$subject[i] 
   
   # Getting the signal
-  data_nonneutral <- dati$signal[data1$subj == which_id & data1$event_type == 2,-c(1:2)]
-  data_neutral <- dati$signal[data1$subj == which_id & data1$event_type == 4,-c(1:2)]
+  data_nonneutral <- dati1$signal[data1$subj == which_id & data1$event_type == 2,]
+  data_neutral <- dati1$signal[data1$subj == which_id & data1$event_type == 4,]
 
   # Storing the signal relative to neutral
   signal[[i]] <- data_nonneutral - data_neutral
@@ -43,7 +44,7 @@ for(i in 1:nrow(design)){
 
 # creating the 3D array we the appropriate dimension
 signal <- abind(signal, along = 3)
-signal <- aperm(signal, c(3, 2, 1))
+signal <- aperm(signal, c(3, 1, 2))
 
 # Select usefull time windows (800ms begining at 200ms at 512hz)
 
@@ -52,25 +53,30 @@ coord <- data.frame(dati$chan_info$electrode,
                     dati$chan_info$cart_y,
                     dati$chan_info$cart_z)
 colnames(coord) <- c("electrode","x","y","z")
+coord <- coord[1:27,]
 
-dati$chan_info <- dati$chan_info[1:27,]
 
-distance_matrix <- dist(cbind(dati$chan_info$cart_x,dati$chan_info$cart_y,dati$chan_info$cart_z))
+coord$electrode <-  as.character(coord$electrode)
+
+distance_matrix <- dist(coord[, 2:4])
+
 adjacency_matrix <- as.matrix(distance_matrix) < 35
 diag(adjacency_matrix) <- FALSE
-dimnames(adjacency_matrix) = list(dati$chan_info$electrode, dati$chan_info$electrode)
+
+dimnames(adjacency_matrix) = list(coord[,1], coord[,1])
 
 graph <- graph_from_adjacency_matrix(adjacency_matrix, mode = "undirected")
-graph <- delete_vertices(graph, V(graph)[!get.vertex.attribute(graph, "name")%in%(dati$chan_info$electrode)])
+graph <- delete_vertices(graph, V(graph)[!get.vertex.attribute(graph, "name")%in%(coord[,1])])
 
-graph <- set_vertex_attr(graph,"x", value = coord[match(vertex_attr(graph,"name"),dati$chan_info$electrode),2])
-graph <-set_vertex_attr(graph,"y", value = coord[match(vertex_attr(graph,"name"),dati$chan_info$electrode),3])
-graph <-set_vertex_attr(graph,"z", value = coord[match(vertex_attr(graph,"name"),dati$chan_info$electrode),4])
+graph <- set_vertex_attr(graph,"x", value = coord[match(vertex_attr(graph,"name"),coord[,1]),2])
+graph <-set_vertex_attr(graph,"y", value = coord[match(vertex_attr(graph,"name"),coord[,1]),3])
+graph <-set_vertex_attr(graph,"z", value = coord[match(vertex_attr(graph,"name"),coord[,1]),4])
 plot(graph)
+
 
 np <- 100 #number of permutations
 aggr_FUN <- sum
-ncores <- 5
+ncores <- 10
 contr <- contr.sum
 formula <- ~ stimuli + Error(subject/(stimuli))
 pmat <- Pmat(np = np, n = nrow(design))
@@ -81,7 +87,7 @@ pmat <- Pmat(np = np, n = nrow(design))
 # @param graph A igraph object representing the adjacency of electrod in a scalp.
 model <- clustergraph_rnd(formula = formula, data = design, signal = signal, graph = graph, 
                           aggr_FUN = aggr_FUN, method = "Rd_kheradPajouh_renaud", contr = contr, 
-                          return_distribution = F, threshold = NULL, ncores = ncores, P = pmat)
+                          return_distribution = T, threshold = NULL, ncores = ncores, P = pmat)
 image(model,effect = 2)
 print(model, effect = "stimuli")
 

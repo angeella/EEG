@@ -1,5 +1,5 @@
 #################Create eeg_lst object##################################
-
+rm(list=ls())
 source("library.R")
 source("utils.R")
 source("utils1.R")
@@ -75,13 +75,16 @@ data.table::setkey(.signal, .id, .sample)
 ## .channel = dati$chan_info$electrode
 ## descriptions_dt = data.table::data.table()
 
-
+#init_events = sample_int(round(dati$events$event_onset * dati$srate) + 1L, sampling_rate = dati$srate)
 .events <- new_events_tbl (
   .id = dati$events$epoch,
   #.initial = dati$events$event_onset %>%
   #  as_sample_int(sampling_rate = dati$srate, unit = "s"),
   .initial = dati$events$event_onset,
-  .final = dati$events$event_onset + 500,
+  #.initial =  init_events,
+  #.final =  init_events,
+  #.final =  round(dati$events$event_time* dati$srate) %>% as.integer() +init_events,
+  .final = dati$events$event_onset + dati$srate - 1L,
   #.final = as_sample_int(dati$events$event_onset, 
   #                      sampling_rate =  dati$srate, unit = "s"),
   #.final = rep(1,length(dati$events$epoch)) %>%
@@ -102,7 +105,8 @@ data.table::setkey(.events, .id)
 segments_tbl <- dplyr::tibble(.id = dati$epochs$epoch, 
                               .recording = dati$epochs$recording,
                               #description = dati$events$event_type,
-                              segment = rep(1,length(dati$epochs$recording)))
+                              segment = rep(1,length(dati$epochs$recording)),
+                              .subj = dati$events$subj)
                               #type = rep("Stimulus", length(dati$epochs$recording)))
 
 segments_tbl <- validate_segments(segments_tbl)
@@ -124,29 +128,41 @@ summary(data)
 channels_tbl(data)
 signal_tbl(data)
 events_tbl(data)
+#Drop off final 5 channels 
+chan_to_rm <- c("RM"  ,  "EOGvo" ,"EOGvu"
+                , "EOGhl", "EOGhr")
+data <- 
+  data %>%
+  select(-one_of(chan_to_rm))
 
 #Filter by condtions happy and neutral faces
 
 data_seg <- data %>%
-  eeg_segment(.description %in% c("2","4"),
+  eeg_segment(.description %in% c("1","4"),
               lim = c(min(dati$timings$time), max(dati$timings$time))
-  ) %>%
-  eeg_baseline()
+  ) 
 
 data_segs_some <- data_seg %>%
   mutate(
     condition =
-      if_else(description == 2, "happy", "neutral")
+      if_else(description == "1", "object", "neutral")
   ) %>%
   select(-type)
 
+save(data, file = "data.RData")
+
+data_segs_some %>%
+  select(O1) %>%
+  ggplot(aes(x = condition, y = .value)) +
+  geom_point(size = 1) +geom_boxplot()
+
 #Some plots
 data_segs_some %>%
-  select(O1, O2, P7, P8) %>%
+  select(O1, O2, PO7, PO8) %>%
   ggplot(aes(x = .time, y = .value)) +
   geom_line(alpha = .1, aes(group = .id, color = condition)) +
   stat_summary(
-    fun.y = "mean", geom = "line", alpha = 1, size = 1.5,
+    fun = "mean", geom = "line", alpha = 1, size = 1.5,
     aes(color = condition)
   ) +
   facet_wrap(~.key) +
@@ -173,7 +189,9 @@ ERP_data <- data_segs_some %>%
   group_by(.sample, condition) %>%
   summarize_at(channel_names(.), mean, na.rm = TRUE)
 
-ERP_plot <- ERP_data %>%
+
+
+ERP_data %>%
   ggplot(aes(x = .time, y = .value)) +
   geom_line(aes(color = condition)) +
   facet_wrap(~.key) +

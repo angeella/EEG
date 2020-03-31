@@ -141,7 +141,7 @@ Already filtered
 ```{r}
 library(future)
 plan(multiprocess)
-plot_psd(D, 
+eegUtils::plot_psd(data, 
          freq_range = c(0, 60),
          legend = FALSE)
 
@@ -149,17 +149,17 @@ plot_psd(D,
 
 
 ```{r}
-plot_butterfly(D,
+plot_butterfly(data,
                time_lim = c(-.1, .5))
 ```
 
 
 ```{r}
-channels(D)
+channels(data)
 ```
 
 ```{r}
-topoplot(D, time_lim = c(.25, .35))
+topoplot(dati$chan_info, time_lim = c(.25, .35))
 ```
 
 
