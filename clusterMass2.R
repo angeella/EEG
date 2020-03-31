@@ -6,6 +6,7 @@ library(permuco4brain)
 library(igraph)
 library(tidyr)
 library(purrr)
+library(ARIpermutation)
 
 load("data.RData")
 
@@ -46,7 +47,7 @@ igraph::rglplot(graph)
 plot(graph)
 
 formula <- signal ~ condition +Error(.subj/(condition))
-np = 1000
+np = 5000
 #pmat <- Pmat(np = np, n = nrow(design))
 model <- permuco4brain::brainperm(  formula = formula,
                                     data = design,
@@ -62,7 +63,6 @@ model <- permuco4brain::brainperm(  formula = formula,
                                     return_distribution = TRUE)
 
 dim(model$model.matrix)
-dim(model$multiple_comparison[[1]]$uncorrected$distribution)
 
 #We visualize the results using a statistical map. 
 #Statistics below the threshold are shown in white, 
@@ -73,4 +73,19 @@ image(model)
 #its cluster-mass and the p-value based on the permutation null distribution:
 print(model, effect = "condition")
 
+#We need to use the matrix of Pvalues distribution having dimension np times k, where
+#k is the number of tests (301*27)
+dim(model$multiple_comparison[[1]]$uncorrected$distribution)
+
+Pvalues <- model$multiple_comparison[[1]]$uncorrected$distribution
+dim(Pvalues) <- c(dim(Pvalues)[1], dim(Pvalues)[2]*dim(Pvalues)[3])
+dim(Pvalues)
+
+lambda <- lambdaOpt(pvalues = Pvalues,family = "Finner", alpha = 0.05, delta = 200)
+
+out <- SingleStepCT(pvalues = Pvalues, ix = c(1,8000), family = "Finner", delta = 10)
+out$discoveries
+
+str(model$multiple_comparison[[1]]$clustermass$cluster)
+str(model$multiple_comparison[[1]]$clustermass$data)
 
