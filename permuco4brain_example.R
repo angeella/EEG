@@ -43,6 +43,8 @@ for(i in 1:nrow(design)){
   # Storing the signal relative to neutral
   signal[[i]] <- data_nonneutral - data_neutral}
 
+
+
 # creating the 3D array we the appropriate dimension
 signal <- abind(signal, along = 3)
 signal <- aperm(signal, c(3, 2, 1))
@@ -90,23 +92,24 @@ graph <-set_vertex_attr(graph,"y", value = coord[match(vertex_attr(graph,"name")
 graph <-set_vertex_attr(graph,"z", value = coord[match(vertex_attr(graph,"name"),coord[,1]),4])
 plot(graph)
 
-np <- 4000
+np <- 5000
 aggr_FUN <- sum
 ncores <- 5
 contr <- contr.sum
 formula <- signal ~ mvpac*stimuli*action + Error(subject/(stimuli*action))
 pmat <- Pmat(np = np, n = nrow(design))
 
-model <- permuco4brain::brainperm(  formula = formula,
+model <- permuco4brain::brainperm(formula = formula,
                                     data = design,
                                     graph = graph,
                                     np = np,
                                     method = NULL,
-                                    type = "permutation",
+                                    type = "signflip",
                                     test = "fisher",
                                     aggr_FUN = NULL,
                                     threshold = NULL,
                                     multcomp = "clustermass",
-                                    effect = NULL,
+                                    effect = 2,
                                     return_distribution = TRUE)
 
+save(model, file = "model_permuco4brain.RData")

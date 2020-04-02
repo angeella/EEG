@@ -7,16 +7,15 @@ library(igraph)
 library(tidyr)
 library(purrr)
 library(ARIpermutation)
+load("data_eeg_emotion.RData")
+load("data_segs_some.RData")
 
-load("data.RData")
-
+data = data_segs_some
 channel_names(data)
 
-data <- data %>% filter(condition %in% c(1,4))  %>%
-  mutate(
-    condition =
-      if_else(condition == 1, "object", "neutral")
-  ) 
+#data$.segments$condition <- dati$events$event_type
+
+#data <- data %>% filter(condition %in% c(1,5))
 
 signal <- 
   data%>%
@@ -28,35 +27,35 @@ signal <-
   invoke(abind::abind,.,along = 3)%>%
   aperm(c(3,1,2))
 
-dim(signal)
+dim(signal)# 40 500  27
 #First dim is the observations, second time, third node
 #We take a subset
 
-signal <- signal[,100:400,]
+signal <- signal[,200:500,]
 
-data$.segments$condition <- data$.events$.description
 
 design <- 
   segments_tbl(data)%>%
   select(.subj, condition)
 
-graph <- position_to_graph(channels_tbl(data), name = .channel, delta = 53,
+graph <- position_to_graph(channels_tbl(data), name = .channel, delta = 3,
                            x = .x, y = .y, z = .z)
 
 igraph::rglplot(graph)
 plot(graph)
 
 formula <- signal ~ condition + Error(.subj/(condition))
-formula <- signal~ .channel*condition + .subj + Error(.subj/(.channel*condition))
+
+
 
 np = 5000
-#pmat <- Pmat(np = np, n = nrow(design))
-model1 <- permuco4brain::brainperm(  formula = formula,
+pmat <- Pmat(np = np, n = nrow(design))
+model <- permuco4brain::brainperm(formula = formula,
                                     data = design,
                                     graph = graph,
                                     np = np,
                                     method = NULL,
-                                    type = "permutation",
+                                    type = "signflip",
                                     test = "fisher",
                                     aggr_FUN = NULL,
                                     threshold = NULL,
@@ -82,12 +81,16 @@ dim(model$multiple_comparison[[1]]$uncorrected$distribution)
 Pvalues <- model$multiple_comparison[[1]]$uncorrected$distribution
 dim(Pvalues) <- c(dim(Pvalues)[1], dim(Pvalues)[2]*dim(Pvalues)[3])
 dim(Pvalues)
+mass_distr = model$multiple_comparison[[1]]$clustermass$distribution
 
-lambda <- lambdaOpt(pvalues = Pvalues,family = "Finner", alpha = 0.05, delta = 200)
+plot(density(mass_distr), main = "clustermass null distributin of",
+     xlab="",ylab="")
+abline(v=mass_distr[1])
 
-out <- SingleStepCT(pvalues = Pvalues, ix = c(1,8000), family = "Finner", delta = 10)
-out$discoveries
+str(model1$multiple_comparison[[1]]$clustermass$cluster)
+str(model1$multiple_comparison[[1]]$clustermass$data)
 
-str(model$multiple_comparison[[1]]$clustermass$cluster)
-str(model$multiple_comparison[[1]]$clustermass$data)
+#samples are the time points
+plot(model,effect = 1,samples = 288)
+plotNullDistribution(P=pvalues,family="Simes",alpha = 0.1, ct = c(0,1))
 

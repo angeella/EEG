@@ -120,7 +120,7 @@ is_eeg_lst(data)
 is_events_tbl(data$.events)
 is_signal_tbl(data$.signal)
 
-plot(data) 
+#plot(data) 
 
 summary(data)
 
@@ -135,28 +135,101 @@ data <-
   data %>%
   select(-one_of(chan_to_rm))
 
-#Filter by condtions happy and neutral faces
-
 data_seg <- data %>%
-  eeg_segment(.description %in% c("1","4"),
+  eeg_segment(.description %in% c(1,2,3,4,5),
               lim = c(min(dati$timings$time), max(dati$timings$time))
-  ) 
+  ) %>% eeg_baseline()
 
 data_segs_some <- data_seg %>%
   mutate(
     condition =
-      if_else(description == "1", "object", "neutral")
+      description
   ) %>%
   select(-type)
 
-save(data, file = "data.RData")
+save(data_segs_some, file = "data_seg_some_all_cond.RData")
+#Filter by condtions happy and neutral faces
+
+data_seg <- data %>%
+  eeg_segment(.description %in% c(3,5),
+              lim = c(min(dati$timings$time), max(dati$timings$time))
+  ) %>% eeg_baseline()
+
+data_segs_some <- data_seg %>%
+  mutate(
+    condition =
+      if_else(description == "3", "disgust", "object")
+  ) %>%
+  select(-type)
+
+save(data_segs_some, file = "data_segs_some.RData")
+
+
+
+#Some plots
+
+#Plot of all the ERP of the O1 electrode
 
 data_segs_some %>%
   select(O1) %>%
-  ggplot(aes(x = condition, y = .value)) +
-  geom_point(size = 1) +geom_boxplot()
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line()
 
-#Some plots
+#Plot ERP of each subject (average across condition):
+
+data_segs_some %>%
+  select(O1) %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(aes(group = .subj))  +
+stat_summary(
+  fun = "mean", geom = "line", alpha = 1, size = 1.5,
+  aes(color = "red"),show.legend = FALSE
+) 
+
+##### average by condition
+Dav=D0_segs%>%group_by(.sample,condition)%>%summarize_all(mean, na.rm = TRUE)
+dim(Dav$.signal)
+plot(Dav%>% select(c(30:40)) )
+
+
+##### average POTENTIAL in range
+AvePot=D0_segs%>%filter(between(as_time(.sample, unit = "s"), .1, .2)) %>%
+  group_by(condition)%>%summarize_all(mean, na.rm = TRUE)
+
+#Plot ERP of condition (average across subject)
+
+data_segs_some %>%
+  select(O1) %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(alpha = 0.1,aes(group = condition))  +
+  stat_summary(
+    fun = "mean", geom = "line", alpha = 1, size = 1.5,
+    aes(color = condition),show.legend = FALSE
+  ) 
+
+###all condition
+data %>%
+  eeg_segment(.description %in% c(1,2,3,4,5),
+              lim = c(min(dati$timings$time), max(dati$timings$time))
+  ) %>% eeg_baseline() %>%
+  mutate(
+    condition =
+      description
+  ) %>%
+  select(-type) %>%
+  select("T7", "T8") %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(aes(group = condition))  +
+  stat_summary(
+    fun = "mean", geom = "line", alpha = 1, size = 1.5,
+    aes(color = condition),show.legend = TRUE
+  ) +
+  facet_wrap(~.key) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = .17, linetype = "dotted") +
+  theme(legend.position = "bottom")
+
+
 data_segs_some %>%
   select(O1, O2, PO7, PO8) %>%
   ggplot(aes(x = .time, y = .value)) +

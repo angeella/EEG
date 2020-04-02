@@ -14,20 +14,31 @@
 #' @export
 #' @importFrom plyr laply
 #' 
-ARIeeg <- function(model, alpha, summary_stat, silent, family, delta, ct){
-  
-  pvalues <- model$multiple_comparison[[1]]$uncorrected$distribution
-  pv_obs <- model$multiple_comparison[[1]]$clustermass$data$pvalue
-  dim(pvalues) <- c(dim(pvalues)[1], dim(pvalues)[2]*dim(pvalues)[3])
-  pvalues <-rbind(pv_obs,pvalues)
-  
+ARIeeg <- function(model, alpha = 0.1, family = "Simes", delta = 0, ct = c(0,1), alternative = "two.sided"){
+  Rcpp::sourceCpp("C:/Users/Angela Andreella/Documents/Rpackage/ARIpermutation/src/rowSortC.cpp")
+  Test <- model$multiple_comparison$stimuli$uncorrected$distribution
+  dim(Test) <- c(dim(Test)[1], dim(Test)[2]*dim(Test)[3])
+  pvalues <- switch(alternative, 
+                    "two.sided" = 2*(pnorm(abs(Test), lower.tail=FALSE)),
+                    "greater" = pnorm(Test, lower.tail=FALSE),
+                    "less" = 1-pnorm(Test, lower.tail=FALSE))
+  test_obs <- model$multiple_comparison$stimuli$clustermass$data$statistic
+  pvalues_obs <- switch(alternative, 
+                    "two.sided" = 2*(pnorm(abs(test_obs), lower.tail=FALSE)),
+                    "greater" = pnorm(test_obs, lower.tail=FALSE),
+                    "less" = 1-pnorm(test_obs, lower.tail=FALSE))
+
+  pvalues <-rbind(pvalues_obs,pvalues)
+  #pvalues <- pvalues[,which(model$multiple_comparison[[1]]$clustermass$data$cluster_id!=0)]
   pvalues_ord <- rowSortC(pvalues)
   lambda <- lambdaOpt(pvalues = pvalues_ord, family = family, ct = ct, alpha = alpha, delta = delta) 
   cvOpt = cv(pvalues = pvalues_ord, family = family, alpha = alpha, lambda= lambda, delta = delta)
   
-  clstr_id <- model$multiple_comparison[[1]]$clustermass$data$cluster_id
-  clusters <- c(1:model$multiple_comparison[[1]]$clustermass$cluster$no)
-  
+ #clstr_id <- model$multiple_comparison[[1]]$clustermass$data$cluster_id[which(model$multiple_comparison[[1]]$clustermass$data$cluster_id!=0)]
+  clstr_id <- model$multiple_comparison$stimuli$clustermass$data$cluster_id
+  #clusters <- c(1:model$multiple_comparison[[1]]$clustermass$cluster$no)[which(model$multiple_comparison[[1]]$clustermass$cluster$pvalue<=0.1)]
+  #clusters <- which(model$multiple_comparison[[1]]$clustermass$cluster$pvalue<=0.1)
+  clusters <- c(1:model$multiple_comparison$stimuli$clustermass$cluster$no)
   out=lapply(clusters,function(i){
     ix= which(clstr_id == i)
     
@@ -59,14 +70,14 @@ summary_perm_eeg <- function(cv,ix,pvalues){
 
 summary_cluster_eeg <- function(clusters,model){
 
-  info <- model$multiple_comparison[[1]]$clustermass$cluster
-  clustermass <- model$multiple_comparison[[1]]$clustermass$cluster$clustermass[clusters]
-  pvalue <- model$multiple_comparison[[1]]$clustermass$cluster$pvalue[clusters]
-  csize <- model$multiple_comparison[[1]]$clustermass$cluster$csize[clusters]
+  info <- model$multiple_comparison$stimuli$clustermass$cluster
+  clustermass <- model$multiple_comparison$stimuli$clustermass$cluster$clustermass[clusters]
+  pvalue <- model$multiple_comparison$stimuli$clustermass$cluster$pvalue[clusters]
+  csize <- model$multiple_comparison$stimuli$clustermass$cluster$csize[clusters]
   #membership <- toString(names(model$multiple_comparison[[1]]$clustermass$cluster$membership[model$multiple_comparison[[1]]$clustermass$cluster$membership ==clusters]))
+  #out=c(clustermass)
+  #names(out)=c("clustermass")
   out=c(clustermass,pvalue,csize)
   names(out)=c("clustermass", "pvalue", "csize")
-  #out=c(clustermass,pvalue,csize, membership)
-  #names(out)=c("clustermass", "pvalue", "csize", "membership")
   out
 }
